@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goal Setting Tool</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+    <style>
+        .container { max-width: 1000px; margin-top: 20px; }
+        .rule-container { margin-top: 20px; }
+        .btn-small { padding: 6px 10px; font-size: 14px; }
+        .rule-box { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .nested-container { margin-left: 20px; border-left: 2px solid #ccc; padding-left: 10px; margin-bottom: 15px; }
+        .dropdown, .form-control { min-width: 130px; }
+        .hidden { display: none; }
+        .section-title { font-weight: bold; margin-top: 15px; }
+        .result-item { margin-bottom: 10px; }
+        .remove-rule { margin-left: 10px; }
+        .results-table { width: 100%; margin-top: 15px; }
+        .export-section { margin-top: 20px; }
+        .value-input-container { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        .saved-rules-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .saved-rule-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .saved-rule-item:last-child {
+            border-bottom: none;
+        }
+        .saved-rule-controls {
+            display: flex;
+            gap: 10px;
+        }
+        .rule-name-input {
+            margin-bottom: 15px;
+        }
+        .sidebar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 250px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .multiselect-dropdown {
+            width: 100%;
+        }
+        .multiselect-dropdown .selected-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .multiselect-dropdown .selected-item {
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+        }
+        .multiselect-dropdown .selected-item .remove {
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        .percentage-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .template-section {
+            margin-top: 20px;
+        }
+        .logic-buttons {
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+        .condition-type {
+            font-weight: bold;
+            min-width: 50px;
+            color: #0d6efd;
+        }
+        .and-condition {
+            background-color: #f0f8ff;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .or-condition {
+            background-color: #fff0f5;
+            padding: 5px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body class="container">
+    <h2 class="text-center">Goal Setting Tool</h2>
+
+    <div class="mb-3">
+        <label for="fileUpload" class="form-label">Upload Excel File</label>
+        <input type="file" id="fileUpload" class="form-control">
+    </div>
+
+    <div id="processSelection" class="mb-3 hidden">
+        <label for="processDropdown" class="form-label">Select Process(es)</label>
+        <div class="multiselect-dropdown">
+            <select id="processDropdown" class="form-select" multiple>
+                <!-- Options will be populated dynamically -->
+            </select>
+            <div id="selectedProcesses" class="selected-items"></div>
+        </div>
+    </div>
+
+    <div id="ruleSection" class="mb-3 hidden">
+        <h4 class="section-title">Create Rule</h4>
+        <div class="rule-name-input">
+            <label for="ruleName">Rule Name</label>
+            <input type="text" id="ruleName" class="form-control" placeholder="Enter a name for this rule">
+        </div>
+        <div id="ruleContainer" class="rule-container"></div>
+        <button id="saveRule" class="btn btn-primary mt-2">Save Rule</button>
+    </div>
+
+    <div id="savedRulesSection" class="mb-3 hidden">
+        <h4 class="section-title">Saved Rules</h4>
+        <div id="savedRulesContainer" class="saved-rules-container">
+            <!-- Saved rules will be displayed here -->
+        </div>
+    </div>
+
+    <div id="selectRulesSection" class="mb-3 hidden">
+        <label for="savedRulesDropdown" class="form-label">Select Saved Rule(s)</label>
+        <select id="savedRulesDropdown" class="form-select" multiple>
+            <!-- Options will be populated dynamically -->
+        </select>
+    </div>
+
+    <div id="applySection" class="mb-3 hidden">
+        <button id="applyRules" class="btn btn-success btn-lg">Apply Rules</button>
+    </div>
+
+    <div id="resultsSection" class="mt-3 hidden">
+        <h4 class="section-title">Results</h4>
+        <div id="resultsTable"></div>
+        <div class="export-section">
+            <button id="exportResults" class="btn btn-primary">Export Results</button>
+        </div>
+    </div>
+
+    <div id="customValueSidebar" class="sidebar hidden">
+        <h5>Custom Value</h5>
+        <div class="mb-3">
+            <label for="customValueInput" class="form-label">Enter Value</label>
+            <input type="text" id="customValueInput" class="form-control">
+        </div>
+        <button id="applyCustomValue" class="btn btn-primary btn-sm">Apply</button>
+        <button id="cancelCustomValue" class="btn btn-secondary btn-sm">Cancel</button>
+    </div>
+
+    <div id="templateSection" class="template-section hidden">
+        <h4 class="section-title">Template Rules</h4>
+        <div class="mb-3">
+            <select id="templateDropdown" class="form-select">
+                <option value="" selected disabled>Select a template</option>
+                <option value="standard">Standard Goal Setting</option>
+                <option value="stretch">Stretch Goals (15% increase)</option>
+                <option value="balanced">Balanced Goals (Multiple Metrics)</option>
+            </select>
+        </div>
+        <button id="applyTemplate" class="btn btn-info">Apply Template</button>
+    </div>
+
+    <script>
+        let columns = [];
+        let processes = [];
+        let data = [];
+        let filteredData = [];
+        let ruleResults = [];
+        let currentRuleId = 0;
+        let savedRules = [];
+        let selectedProcesses = [];
+        let activeValueFieldId = null;
+
+        document.getElementById("fileUpload").addEventListener("change", function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.readAsArrayBuffer(file);
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet);
+                processExcelData(jsonData);
+            };
+        });
+
+        function processExcelData(jsonData) {
+            data = jsonData;
+            processes = [...new Set(data.map(row => row.process).filter(p => p !== undefined))];
+            columns = Object.keys(data[0]).filter(col => col !== "process");
+
+            if (processes.length === 0) {
+                alert("No processes found in file!");
+                return;
+            }
+
+            let processDropdown = document.getElementById("processDropdown");
+            processDropdown.innerHTML = processes.map(p => `<option value="${p}">${p}</option>`).join("");
+            
+            document.getElementById("processSelection").classList.remove("hidden");
+            setupProcessMultiselect();
+            
+            // Show template section
+            document.getElementById("templateSection").classList.remove("hidden");
+        }
+
+        function setupProcessMultiselect() {
+            const dropdown = document.getElementById("processDropdown");
+            const selectedContainer = document.getElementById("selectedProcesses");
+            
+            dropdown.addEventListener("change", function(e) {
+                selectedProcesses = Array.from(this.selectedOptions).map(option => option.value);
+                renderSelectedProcesses();
+                
+                document.getElementById("ruleSection").classList.remove("hidden");
+                document.getElementById("savedRulesSection").classList.remove("hidden");
+                document.getElementById("applySection").classList.remove("hidden");
+                document.getElementById("resultsSection").classList.add("hidden");
+                
+                // Show the select rules section
+                document.getElementById("selectRulesSection").classList.remove("hidden");
+
+                if (document.getElementById("ruleContainer").innerHTML === "") {
+                    initializeRuleCreation();
+                }
+                
+                filterByProcesses();
+            });
+            
+            function renderSelectedProcesses() {
+                selectedContainer.innerHTML = selectedProcesses.map(process => 
+                    `<div class="selected-item">${process} <span class="remove" data-process="${process}">✕</span></div>`
+                ).join("");
+                
+                // Add event listeners to remove buttons
+                document.querySelectorAll(".selected-item .remove").forEach(btn => {
+                    btn.addEventListener("click", function() {
+                        const process = this.getAttribute("data-process");
+                        selectedProcesses = selectedProcesses.filter(p => p !== process);
+                        
+                        // Update the select element
+                        Array.from(dropdown.options).forEach(option => {
+                            if (option.value === process) {
+                                option.selected = false;
+                            }
+                        });
+                        
+                        renderSelectedProcesses();
+                        filterByProcesses();
+                    });
+                });
+            }
+        }
+
+        function filterByProcesses() {
+            filteredData = data.filter(row => selectedProcesses.includes(row.process));
+        }
+
+        function initializeRuleCreation() {
+            currentRuleId++;
+            let ruleHtml = getRuleHtml(currentRuleId);
+            document.getElementById("ruleContainer").innerHTML = ruleHtml;
+            attachColumnOrValueListeners(currentRuleId);
+            attachAllEventListeners();
+        }
+
+        document.getElementById("saveRule").addEventListener("click", function() {
+            const ruleName = document.getElementById("ruleName").value.trim();
+            if (!ruleName) {
+                alert("Please enter a rule name.");
+                return;
+            }
+            
+            const ruleTree = buildRuleTree();
+            
+            // Save rule
+            savedRules.push({
+                id: Date.now(),
+                name: ruleName,
+                rule: ruleTree[0] // Get the first rule (there's only one top-level rule)
+            });
+            
+            // Update saved rules display
+            displaySavedRules();
+            
+            // Clear the current rule
+            document.getElementById("ruleName").value = "";
+            document.getElementById("ruleContainer").innerHTML = "";
+            initializeRuleCreation();
+        });
+
+        function displaySavedRules() {
+            console.log("Displaying saved rules:", savedRules);
+            
+            const container = document.getElementById("savedRulesContainer");
+            const dropdown = document.getElementById("savedRulesDropdown");
+
+            if (savedRules.length === 0) {
+                container.innerHTML = "<p>No saved rules yet.</p>";
+                dropdown.innerHTML = "";
+                return;
+            }
+            
+            // Populate the saved rules container
+            container.innerHTML = savedRules.map(rule => `
+                <div class="saved-rule-item">
+                    <span>${rule.name}</span>
+                    <div class="saved-rule-controls">
+                        <button class="btn btn-sm btn-outline-primary edit-rule" data-id="${rule.id}">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger delete-rule" data-id="${rule.id}">Delete</button>
+                    </div>
+                </div>
+            `).join("");
+
+            // Populate the saved rules dropdown
+            dropdown.innerHTML = savedRules.map(rule => `<option value="${rule.id}">${rule.name}</option>`).join("");
+
+            // Add event listeners for edit and delete buttons
+            document.querySelectorAll(".edit-rule").forEach(btn => {
+                btn.addEventListener("click", function() {
+                    const ruleId = parseInt(this.getAttribute("data-id"));
+                    const rule = savedRules.find(r => r.id === ruleId);
+                    if (rule) {
+                        loadRuleForEditing(rule);
+                    }
+                });
+            });
+            
+            document.querySelectorAll(".delete-rule").forEach(btn => {
+                btn.addEventListener("click", function() {
+                    const ruleId = parseInt(this.getAttribute("data-id"));
+                    if (confirm("Are you sure you want to delete this rule?")) {
+                        savedRules = savedRules.filter(r => r.id !== ruleId);
+                        displaySavedRules();
+                    }
+                });
+            });
+        }
+
+        function loadRuleForEditing(rule) {
+            console.log("Loading rule for editing:", rule);
+            
+            document.getElementById('ruleName').value = rule.name;
+            document.getElementById('ruleContainer').innerHTML = '';
+            
+            // Make a deep copy of the rule to avoid any reference issues
+            const ruleCopy = JSON.parse(JSON.stringify(rule.rule));
+            
+            // Recreate the rule UI
+            const ruleHtml = recreateRuleHtml(ruleCopy);
+            document.getElementById('ruleContainer').innerHTML = ruleHtml;
+            
+            // Reattach event listeners
+            attachAllEventListeners();
+            
+            // Remove the rule from saved rules
+            savedRules = savedRules.filter(r => r.id !== rule.id);
+            displaySavedRules();
+        }
+        function recreateRuleHtml(rule) {
+    console.log("Recreating HTML for rule:", rule);
+    
+    if (!rule || !rule.condition) {
+        console.warn("Invalid rule structure for recreation");
+        return getRuleHtml(++currentRuleId);
+    }
+    
+    const ruleId = ++currentRuleId;
+    
+    // Create the main rule container
+    let ruleHtml = `
+        <div class='nested-container' data-rule-id="${ruleId}">
+            <div class='rule-box'>
+                <span>If</span>
+                <select class='form-select columnSelect dropdown'>
+                    ${columns.map(col => `<option value="${col}" ${col === rule.condition.leftColumn ? 'selected' : ''}>${col}</option>`).join("")}
+                </select>
+                <select class='form-select operatorSelect dropdown'>
+                    <option value='>' ${rule.condition.operator === '>' ? 'selected' : ''}>></option>
+                    <option value='<' ${rule.condition.operator === '<' ? 'selected' : ''}><</option>
+                    <option value='=' ${rule.condition.operator === '=' ? 'selected' : ''}>=</option>
+                    <option value='>=' ${rule.condition.operator === '>=' ? 'selected' : ''}>>=</option>
+                    <option value='<=' ${rule.condition.operator === '<=' ? 'selected' : ''}><=</option>
+                </select>
+                <select class='form-select columnOrValue dropdown' data-rule-id="${ruleId}">
+                    <option value='value' ${rule.condition.rightType === 'value' ? 'selected' : ''}>Type Value</option>
+                    <option value='custom' ${rule.condition.rightType === 'custom' ? 'selected' : ''}>Add Custom Value</option>
+                    ${columns.map(col => `<option value="${col}" ${col === rule.condition.rightColumn ? 'selected' : ''}>${col}</option>`).join("")}
+                </select>
+                <input type='number' class='form-control valueSelect ${rule.condition.rightType === 'value' || rule.condition.rightType === 'custom' ? '' : 'hidden'}' data-rule-id="${ruleId}" placeholder='Enter Value' value="${rule.condition.rightValue || ''}">
+                <button class='btn btn-danger btn-small remove-rule'>×</button>
+            </div>`;
+    
+    // Add AND/OR conditions if they exist
+    if (rule.condition.andConditions && rule.condition.andConditions.length > 0) {
+        rule.condition.andConditions.forEach(andCondition => {
+            const andRuleId = ++currentRuleId;
+            ruleHtml += `
+                <div class='rule-box and-condition'>
+                    <span class="condition-type">AND</span>
+                    <select class='form-select columnSelect dropdown'>
+                        ${columns.map(col => `<option value="${col}" ${col === andCondition.leftColumn ? 'selected' : ''}>${col}</option>`).join("")}
+                    </select>
+                    <select class='form-select operatorSelect dropdown'>
+                        <option value='>' ${andCondition.operator === '>' ? 'selected' : ''}>></option>
+                        <option value='<' ${andCondition.operator === '<' ? 'selected' : ''}><</option>
+                        <option value='=' ${andCondition.operator === '=' ? 'selected' : ''}>=</option>
+                        <option value='>=' ${andCondition.operator === '>=' ? 'selected' : ''}>>=</option>
+                        <option value='<=' ${andCondition.operator === '<=' ? 'selected' : ''}><=</option>
+                    </select>
+                    <select class='form-select columnOrValue dropdown' data-rule-id="${andRuleId}">
+                        <option value='value' ${andCondition.rightType === 'value' ? 'selected' : ''}>Type Value</option>
+                        <option value='custom' ${andCondition.rightType === 'custom' ? 'selected' : ''}>Add Custom Value</option>
+                        ${columns.map(col => `<option value="${col}" ${col === andCondition.rightColumn ? 'selected' : ''}>${col}</option>`).join("")}
+                    </select>
+                    <input type='number' class='form-control valueSelect ${andCondition.rightType === 'value' || andCondition.rightType === 'custom' ? '' : 'hidden'}' data-rule-id="${andRuleId}" placeholder='Enter Value' value="${andCondition.rightValue || ''}">
+                    <button class='btn btn-danger btn-small remove-rule'>×</button>
+                </div>`;
+        });
+    }
+    
+    if (rule.condition.orConditions && rule.condition.orConditions.length > 0) {
+        rule.condition.orConditions.forEach(orCondition => {
+            const orRuleId = ++currentRuleId;
+            ruleHtml += `
+                <div class='rule-box or-condition'>
+                    <span class="condition-type">OR</span>
+                    <select class='form-select columnSelect dropdown'>
+                        ${columns.map(col => `<option value="${col}" ${col === orCondition.leftColumn ? 'selected' : ''}>${col}</option>`).join("")}
+                    </select>
+                    <select class='form-select operatorSelect dropdown'>
+                        <option value='>' ${orCondition.operator === '>' ? 'selected' : ''}>></option>
+                        <option value='<' ${orCondition.operator === '<' ? 'selected' : ''}><</option>
+                        <option value='=' ${orCondition.operator === '=' ? 'selected' : ''}>=</option>
+                        <option value='>=' ${orCondition.operator === '>=' ? 'selected' : ''}>>=</option>
+                        <option value='<=' ${orCondition.operator === '<=' ? 'selected' : ''}><=</option>
+                    </select>
+                    <select class='form-select columnOrValue dropdown' data-rule-id="${orRuleId}">
+                        <option value='value' ${orCondition.rightType === 'value' ? 'selected' : ''}>Type Value</option>
+                        <option value='custom' ${orCondition.rightType === 'custom' ? 'selected' : ''}>Add Custom Value</option>
+                        ${columns.map(col => `<option value="${col}" ${col === orCondition.rightColumn ? 'selected' : ''}>${col}</option>`).join("")}
+                    </select>
+                    <input type='number' class='form-control valueSelect ${orCondition.rightType === 'value' || orCondition.rightType === 'custom' ? '' : 'hidden'}' data-rule-id="${orRuleId}" placeholder='Enter Value' value="${orCondition.rightValue || ''}">
+                    <button class='btn btn-danger btn-small remove-rule'>×</button>
+                </div>`;
+        });
+    }
+    
+    // Add the logic buttons
+    ruleHtml += `
+        <div class='rule-box logic-buttons'>
+            <button class='btn btn-info btn-small addAndCondition'>+ AND</button>
+            <button class='btn btn-info btn-small addOrCondition'>+ OR</button>
+        </div>`;
+    
+    // Add the "Then" action
+    ruleHtml += `
+        <div class='nested-container'>
+            <div class='rule-box'>
+                <span>Then</span>
+                <select class='form-select resultColumn dropdown'>
+                    ${columns.map(col => `<option value="${col}" ${col === rule.action.column ? 'selected' : ''}>${col}</option>`).join("")}
+                </select>
+                <select class='form-select actionType dropdown'>
+                    <option value='value' ${rule.action.type === 'value' ? 'selected' : ''}>Set Value</option>
+                    <option value='add' ${rule.action.type === 'add' ? 'selected' : ''}>Add Value</option>
+                    <option value='subtract' ${rule.action.type === 'subtract' ? 'selected' : ''}>Subtract Value</option>
+                    <option value='percent-increase' ${rule.action.type === 'percent-increase' ? 'selected' : ''}>% Increase</option>
+                    <option value='percent-decrease' ${rule.action.type === 'percent-decrease' ? 'selected' : ''}>% Decrease</option>
+                </select>
+                <input type='number' class='form-control thresholdSelect' placeholder='Value' value="${rule.action.value || ''}">
+                <span class='percentage-symbol ${rule.action.type === 'percent-increase' || rule.action.type === 'percent-decrease' ? '' : 'hidden'}'>%</span>
+            </div>
+            <div class='rule-box'>
+                <span>Else</span>
+                <button class='btn btn-secondary btn-small addNestedIf'>+ Add Nested If</button>
+                <button class='btn btn-secondary btn-small addElseCondition'>+ Add Else Condition</button>
+            </div>
+        </div>`;
+    
+    // Add nested rules if they exist
+    // Add nested rules if they exist
+    if (rule.nestedRules && rule.nestedRules.length > 0) {
+        rule.nestedRules.forEach(nestedRule => {
+            ruleHtml += recreateRuleHtml(nestedRule);
+        });
+    }
+    
+    // Add else action if it exists
+    if (rule.elseAction) {
+        console.log("Recreating else action:", rule.elseAction);
+        ruleHtml += `
+            <div class='nested-container'>
+                <div class='rule-box'>
+                    <span>Else Condition</span>
+                    <select class='form-select resultColumn dropdown'>
+                        ${columns.map(col => `<option value="${col}" ${col === rule.elseAction.column ? 'selected' : ''}>${col}</option>`).join("")}
+                    </select>
+                    <select class='form-select actionType dropdown'>
+                        <option value='value' ${rule.elseAction.type === 'value' ? 'selected' : ''}>Set Value</option>
+                        <option value='add' ${rule.elseAction.type === 'add' ? 'selected' : ''}>Add Value</option>
+                        <option value='subtract' ${rule.elseAction.type === 'subtract' ? 'selected' : ''}>Subtract Value</option>
+                        <option value='percent-increase' ${rule.elseAction.type === 'percent-increase' ? 'selected' : ''}>% Increase</option>
+                        <option value='percent-decrease' ${rule.elseAction.type === 'percent-decrease' ? 'selected' : ''}>% Decrease</option>
+                    </select>
+                    <input type='number' class='form-control thresholdSelect' placeholder='Value' value="${rule.elseAction.value || ''}">
+                    <span class='percentage-symbol ${rule.elseAction.type === 'percent-increase' || rule.elseAction.type === 'percent-decrease' ? '' : 'hidden'}'>%</span>
+                    <button class='btn btn-danger btn-small remove-rule'>×</button>
+                </div>
+            </div>`;
+    }
+    
+    ruleHtml += `</div>`;
+    return ruleHtml;
+}
+
+        // Add new function to generate AND condition HTML
+        function getAndConditionHtml() {
+            currentRuleId++;
+            return `
+                <div class='rule-box and-condition'>
+                    <span class="condition-type">AND</span>
+                    <select class='form-select columnSelect dropdown'>
+                        ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                    </select>
+                    <select class='form-select operatorSelect dropdown'>
+                        <option value='>'>></option>
+                        <option value='<'><</option>
+                        <option value='='>=</option>
+                        <option value='>='>>=</option>
+                        <option value='<='><=</option>
+                    </select>
+                    <select class='form-select columnOrValue dropdown' data-rule-id="${currentRuleId}">
+                        <option value='value'>Type Value</option>
+                        <option value='custom'>Add Custom Value</option>
+                        ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                    </select>
+                    <input type='number' class='form-control valueSelect hidden' data-rule-id="${currentRuleId}" placeholder='Enter Value'>
+                    <button class='btn btn-danger btn-small remove-rule'>×</button>
+                </div>
+            `;
+        }
+
+        // Add new function to generate OR condition HTML
+        function getOrConditionHtml() {
+            currentRuleId++;
+            return `
+                <div class='rule-box or-condition'>
+                    <span class="condition-type">OR</span>
+                    <select class='form-select columnSelect dropdown'>
+                        ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                    </select>
+                    <select class='form-select operatorSelect dropdown'>
+                        <option value='>'>></option>
+                        <option value='<'><</option>
+                        <option value='='>=</option>
+                        <option value='>='>>=</option>
+                        <option value='<='><=</option>
+                    </select>
+                    <select class='form-select columnOrValue dropdown' data-rule-id="${currentRuleId}">
+                        <option value='value'>Type Value</option>
+                        <option value='custom'>Add Custom Value</option>
+                        ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                    </select>
+                    <input type='number' class='form-control valueSelect hidden' data-rule-id="${currentRuleId}" placeholder='Enter Value'>
+                    <button class='btn btn-danger btn-small remove-rule'>×</button>
+                </div>
+            `;
+        }
+        function getRuleHtml(ruleId) {
+            return `
+                <div class='nested-container' data-rule-id="${ruleId}">
+                    <div class='rule-box'>
+                        <span>If</span>
+                        <select class='form-select columnSelect dropdown'>
+                            ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                        </select>
+                        <select class='form-select operatorSelect dropdown'>
+                            <option value='>'>></option>
+                            <option value='<'><</option>
+                            <option value='='>=</option>
+                            <option value='>='>>=</option>
+                            <option value='<='><=</option>
+                        </select>
+                        <select class='form-select columnOrValue dropdown' data-rule-id="${ruleId}">
+                            <option value='value'>Type Value</option>
+                            <option value='custom'>Add Custom Value</option>
+                            ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                        </select>
+                        <input type='number' class='form-control valueSelect hidden' data-rule-id="${ruleId}" placeholder='Enter Value'>
+                        <button class='btn btn-danger btn-small remove-rule'>×</button>
+                    </div>
+                    <div class='rule-box logic-buttons'>
+                        <button class='btn btn-info btn-small addAndCondition'>+ AND</button>
+                        <button class='btn btn-info btn-small addOrCondition'>+ OR</button>
+                    </div>
+                    <div class='nested-container'>
+                        <div class='rule-box'>
+                            <span>Then</span>
+                            <select class='form-select resultColumn dropdown'>${columns.map(col => `<option value="${col}">${col}</option>`).join("")}</select>
+                            <select class='form-select actionType dropdown'>
+                                <option value='value'>Set Value</option>
+                                <option value='add'>Add Value</option>
+                                <option value='subtract'>Subtract Value</option>
+                                <option value='percent-increase'>% Increase</option>
+                                <option value='percent-decrease'>% Decrease</option>
+                            </select>
+                            <input type='number' class='form-control thresholdSelect' placeholder='Value'>
+                            <span class='percentage-symbol hidden'>%</span>
+                        </div>
+                        <div class='rule-box'>
+                            <span>Else</span>
+                            <button class='btn btn-secondary btn-small addNestedIf'>+ Add Nested If</button>
+                            <button class='btn btn-secondary btn-small addElseCondition'>+ Add Else Condition</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getElseConditionHtml() {
+            return `
+                <div class='nested-container'>
+                    <div class='rule-box'>
+                        <span>Else Condition</span>
+                        <select class='form-select resultColumn dropdown'>${columns.map(col => `<option value="${col}">${col}</option>`).join("")}</select>
+                        <select class='form-select actionType dropdown'>
+                            <option value='value'>Set Value</option>
+                            <option value='add'>Add Value</option>
+                            <option value='subtract'>Subtract Value</option>
+                            <option value='percent-increase'>% Increase</option>
+                            <option value='percent-decrease'>% Decrease</option>
+                        </select>
+                        <input type='number' class='form-control thresholdSelect' placeholder='Value'>
+                        <span class='percentage-symbol hidden'>%</span>
+                        <button class='btn btn-danger btn-small remove-rule'>×</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Attach event listeners for column or value selection
+        function attachColumnOrValueListeners(ruleId) {
+            // For column or value selection
+            document.querySelectorAll(`.columnOrValue[data-rule-id="${ruleId}"]`).forEach(select => {
+                select.addEventListener("change", function() {
+                    const valueInput = document.querySelector(`.valueSelect[data-rule-id="${ruleId}"]`);
+                    
+                    if (this.value === 'value') {
+                        valueInput.classList.remove("hidden");
+                    } else if (this.value === 'custom') {
+                        // Show custom value sidebar
+                        activeValueFieldId = ruleId;
+                        document.getElementById("customValueSidebar").classList.remove("hidden");
+                        valueInput.classList.add("hidden");
+                    } else {
+                        valueInput.classList.add("hidden");
+                    }
+                });
+            });
+            
+            // For action type selection
+            document.querySelectorAll('.actionType').forEach(select => {
+                select.addEventListener("change", function() {
+                    const percentageSymbol = this.closest('.rule-box').querySelector('.percentage-symbol');
+                    
+                    if (this.value === 'percent-increase' || this.value === 'percent-decrease') {
+                        percentageSymbol.classList.remove("hidden");
+                    } else {
+                        percentageSymbol.classList.add("hidden");
+                    }
+                });
+            });
+        }
+
+    // Add this function to attach all event listeners after adding new rules
+    function attachAllEventListeners() {
+        document.querySelectorAll('.columnOrValue').forEach(select => {
+            const ruleId = select.getAttribute('data-rule-id');
+            if (ruleId) {
+                attachColumnOrValueListeners(ruleId);
+            }
+        });
+        
+        document.querySelectorAll('.actionType').forEach(select => {
+            select.addEventListener('change', function() {
+                const percentageSymbol = this.closest('.rule-box').querySelector('.percentage-symbol');
+                
+                if (this.value === 'percent-increase' || this.value === 'percent-decrease') {
+                    percentageSymbol.classList.remove('hidden');
+                } else {
+                    percentageSymbol.classList.add('hidden');
+                }
+            });
+        });
+    }
+
+    // Update the ruleContainer event listener to handle AND/OR buttons
+    document.getElementById('ruleContainer').addEventListener('click', function(event) {
+        // Add nested if condition
+        if (event.target.classList.contains('addNestedIf')) {
+            currentRuleId++;
+            let nestedIfHtml = getRuleHtml(currentRuleId);
+            event.target.closest('.nested-container').insertAdjacentHTML('afterend', nestedIfHtml);
+            attachColumnOrValueListeners(currentRuleId);
+        }
+        
+        // Add else condition
+        if (event.target.classList.contains('addElseCondition')) {
+            let elseHtml = getElseConditionHtml();
+            event.target.closest('.rule-box').insertAdjacentHTML('afterend', elseHtml);
+            // Reattach event listeners for the new else condition
+            attachAllEventListeners();
+        }
+        
+        // Add AND condition
+        if (event.target.classList.contains('addAndCondition')) {
+            let andConditionHtml = getAndConditionHtml();
+            const logicButtons = event.target.closest('.logic-buttons');
+            logicButtons.insertAdjacentHTML('beforebegin', andConditionHtml);
+            attachAllEventListeners();
+        }
+        
+        // Add OR condition
+        if (event.target.classList.contains('addOrCondition')) {
+            let orConditionHtml = getOrConditionHtml();
+            const logicButtons = event.target.closest('.logic-buttons');
+            logicButtons.insertAdjacentHTML('beforebegin', orConditionHtml);
+            attachAllEventListeners();
+        }
+        
+        // Remove rule
+        if (event.target.classList.contains('remove-rule')) {
+            const parentContainer = event.target.closest('.nested-container');
+            if (parentContainer) {
+                parentContainer.remove();
+            } else {
+                // If it's an AND/OR condition that doesn't have a nested container parent
+                const conditionBox = event.target.closest('.rule-box');
+                if (conditionBox) {
+                    conditionBox.remove();
+                }
+            }
+        }
+    });
+
+    document.getElementById("applyRules").addEventListener("click", function() {
+        const selectedRuleIds = Array.from(document.getElementById("savedRulesDropdown").selectedOptions).map(option => parseInt(option.value));
+        
+        if (selectedRuleIds.length === 0) {
+            alert("Please select at least one rule before applying.");
+            return;
+        }
+        
+        if (filteredData.length === 0) {
+            alert("No data to process. Please select at least one process.");
+            return;
+        }
+        
+        // Create a deep copy of filtered data to avoid modifying the original
+        const processedData = JSON.parse(JSON.stringify(filteredData));
+        
+        // Apply each selected rule to the data
+        for (const ruleId of selectedRuleIds) {
+            const rule = savedRules.find(r => r.id === ruleId);
+            if (rule) {
+                applyRuleToData(rule.rule, processedData);
+            }
+        }
+        
+        // Display results
+        displayResults(processedData);
+    });
+
+    function applyRuleToData(rule, data) {
+        // Apply the rule to each row of data
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            applyRuleToRow(rule, row);
+        }
+    }
+
+    function applyRuleToRow(rule, row) {
+        if (!rule || !rule.condition || !rule.action) return;
+        
+        // Evaluate the main condition
+        let conditionMet = evaluateCondition(rule.condition, row);
+        
+        // Evaluate AND conditions if they exist
+        if (conditionMet && rule.condition.andConditions) {
+            for (const andCondition of rule.condition.andConditions) {
+                if (!evaluateCondition(andCondition, row)) {
+                    conditionMet = false;
+                    break;
+                }
+            }
+        }
+        
+        // Evaluate OR conditions if they exist
+        if (!conditionMet && rule.condition.orConditions) {
+            for (const orCondition of rule.condition.orConditions) {
+                if (evaluateCondition(orCondition, row)) {
+                    conditionMet = true;
+                    break;
+                }
+            }
+        }
+        
+        if (conditionMet) {
+            // Apply the action
+            applyAction(row, rule.action);
+        } else if (rule.elseAction) {
+            // Apply else action if it exists
+            applyAction(row, rule.elseAction);
+        } else if (rule.nestedRules) {
+            // Apply nested rules if they exist
+            for (const nestedRule of rule.nestedRules) {
+                applyRuleToRow(nestedRule, row);
+            }
+        }
+    }
+
+    // Helper function to evaluate a single condition
+    function evaluateCondition(condition, row) {
+        if (!condition || !condition.leftColumn) return false;
+        
+        const leftColumn = condition.leftColumn;
+        const leftValue = parseFloat(row[leftColumn]);
+        let rightValue;
+        
+        if (condition.rightType === 'value' || condition.rightType === 'custom') {
+            rightValue = parseFloat(condition.rightValue);
+        } else {
+            rightValue = parseFloat(row[condition.rightColumn]);
+        }
+        
+        // Handle NaN values
+        if (isNaN(leftValue) || isNaN(rightValue)) {
+            return false;
+        }
+        
+        let conditionMet = false;
+        
+        switch(condition.operator) {
+            case '>':
+                conditionMet = leftValue > rightValue;
+                break;
+            case '<':
+                conditionMet = leftValue < rightValue;
+                break;
+            case '=':
+                conditionMet = leftValue == rightValue;
+                break;
+            case '>=':
+                conditionMet = leftValue >= rightValue;
+                break;
+            case '<=':
+                conditionMet = leftValue <= rightValue;
+                break;
+            default:
+                conditionMet = false;
+        }
+        
+        return conditionMet;
+    }
+
+    function applyAction(row, action) {
+        if (!action || !action.column) return;
+        
+        const column = action.column;
+        let currentValue = parseFloat(row[column]);
+        if (isNaN(currentValue)) currentValue = 0;
+        
+        const actionValue = parseFloat(action.value);
+        if (isNaN(actionValue)) return;
+        
+        let newValue;
+        
+        switch(action.type) {
+            case 'value':
+                newValue = actionValue;
+                break;
+            case 'add':
+                newValue = currentValue + actionValue;
+                break;
+            case 'subtract':
+                newValue = currentValue - actionValue;
+                break;
+            case 'percent-increase':
+                newValue = currentValue * (1 + actionValue / 100);
+                break;
+            case 'percent-decrease':
+                newValue = currentValue * (1 - actionValue / 100);
+                break;
+            default:
+                newValue = currentValue;
+        }
+        
+        // Round the value to 2 decimal places for display
+        newValue = Math.round(newValue * 100) / 100;
+        
+        // Store the calculated value in the data row
+        row[column] = newValue;
+        
+        // If this is a G2 goal calculation, also set it directly to New_G2_goal
+        if (column.startsWith("G2")) {
+            row['New_G2_goal'] = newValue;
+        } else {
+            // For other columns, if New_G2_goal doesn't exist, create it with the calculated value
+            if (!('New_G2_goal' in row)) {
+                row['New_G2_goal'] = newValue;
+            }
+        }
+    }
+    function buildRuleTree() {
+    const rules = [];
+    const topLevelRules = document.querySelectorAll('#ruleContainer > .nested-container');
+    
+    topLevelRules.forEach(ruleElement => {
+        const rule = buildRuleFromElement(ruleElement);
+        rules.push(rule);
+    });
+    
+    return rules;
+}
+
+function buildRuleFromElement(ruleElement) {
+    const conditionBox = ruleElement.querySelector(':scope > .rule-box');
+    const nestedContainers = Array.from(ruleElement.querySelectorAll(':scope > .nested-container'));
+    
+    if (!conditionBox || nestedContainers.length === 0) {
+        return null;
+    }
+
+    // Extract main condition
+    const leftColumn = conditionBox.querySelector('.columnSelect')?.value;
+    const operator = conditionBox.querySelector('.operatorSelect')?.value;
+    const rightTypeSelect = conditionBox.querySelector('.columnOrValue');
+    const rightType = rightTypeSelect?.value || 'value';
+
+    let rightValue = null;
+    let rightColumn = null;
+
+    if (rightType === 'value' || rightType === 'custom') {
+        const valueInput = conditionBox.querySelector('.valueSelect');
+        rightValue = valueInput?.value || '0';
+    } else {
+        rightColumn = rightType;
+    }
+
+    // Extract AND/OR conditions
+    const andConditions = [];
+    const orConditions = [];
+    
+    // Look for sibling rule-box elements with the and-condition/or-condition class
+    const logicConditions = Array.from(ruleElement.querySelectorAll(':scope > .rule-box.and-condition, :scope > .rule-box.or-condition'));
+    
+    logicConditions.forEach(conditionElem => {
+        const isAnd = conditionElem.classList.contains('and-condition');
+        const condition = {
+            leftColumn: conditionElem.querySelector('.columnSelect')?.value,
+            operator: conditionElem.querySelector('.operatorSelect')?.value,
+            rightType: conditionElem.querySelector('.columnOrValue')?.value || 'value',
+            rightValue: null,
+            rightColumn: null
+        };
+        
+        if (condition.rightType === 'value' || condition.rightType === 'custom') {
+            condition.rightValue = conditionElem.querySelector('.valueSelect')?.value || '0';
+        } else {
+            condition.rightColumn = condition.rightType;
+        }
+        
+        if (isAnd) {
+            andConditions.push(condition);
+        } else {
+            orConditions.push(condition);
+        }
+    });
+
+    // Process Then/Action part - this is always the first nested container
+    const thenContainer = nestedContainers[0];
+    const thenActionBox = thenContainer.querySelector(':scope > .rule-box:first-child');
+    
+    if (!thenActionBox) {
+        return null;
+    }
+    
+    // Extract action information
+    const actionColumn = thenActionBox.querySelector('.resultColumn')?.value;
+    const actionType = thenActionBox.querySelector('.actionType')?.value;
+    const actionValue = thenActionBox.querySelector('.thresholdSelect')?.value;
+
+    // Process nested rules and else conditions - we need better identification here
+    const nestedRuleElements = [];
+    const elseActionElements = [];
+
+    // Skip the first nested container (the Then part) and check the rest
+    for (let i = 0; i < nestedContainers.length; i++) {
+        const container = nestedContainers[i];
+        
+        // Skip the first container (it's the Then action)
+        if (i === 0) continue;
+        
+        // Check every rule box in the container
+        const ruleBoxes = container.querySelectorAll('.rule-box');
+        Array.from(ruleBoxes).forEach(box => {
+            const spanText = box.querySelector('span')?.textContent?.trim();
+            
+            // If this is an "Else Condition", add to elseActionElements
+            if (spanText === 'Else Condition') {
+                elseActionElements.push(box);
+            }
+        });
+        
+        // If the container has a rule box that starts with "If", it's a nested rule
+        if (container.querySelector('.rule-box > span')?.textContent?.trim() === 'If') {
+            nestedRuleElements.push(container);
+        }
+    }
+    
+    // Build nested rules
+    const nestedRules = nestedRuleElements.map(nestedElement => buildRuleFromElement(nestedElement));
+    
+    // Build the rule object
+    const rule = {
+        condition: {
+            leftColumn,
+            operator,
+            rightType,
+            rightValue,
+            rightColumn,
+            andConditions: andConditions.length > 0 ? andConditions : null,
+            orConditions: orConditions.length > 0 ? orConditions : null
+        },
+        action: {
+            column: actionColumn,
+            type: actionType,
+            value: actionValue
+        },
+        nestedRules: nestedRules.length > 0 ? nestedRules : null
+    };
+    
+    // Add else actions if they exist
+    if (elseActionElements.length > 0) {
+        // Add the first else action as the primary elseAction
+        const primaryElse = elseActionElements[0];
+        rule.elseAction = {
+            column: primaryElse.querySelector('.resultColumn')?.value,
+            type: primaryElse.querySelector('.actionType')?.value,
+            value: primaryElse.querySelector('.thresholdSelect')?.value
+        };
+        
+        // If there are multiple else actions, store them as well
+        if (elseActionElements.length > 1) {
+            rule.extraElseActions = elseActionElements.slice(1).map(elseElem => ({
+                column: elseElem.querySelector('.resultColumn')?.value,
+                type: elseElem.querySelector('.actionType')?.value,
+                value: elseElem.querySelector('.thresholdSelect')?.value
+            }));
+        }
+    }
+    
+    return rule;
+}
+
+function displayResults(processedData) {
+    const resultsSection = document.getElementById("resultsSection");
+    resultsSection.classList.remove("hidden");
+    
+    // Create a table to display the results
+    let tableHtml = `
+        <table class="table table-striped results-table">
+            <thead>
+                <tr>
+                    <th>Process</th>
+                    ${columns.map(col => `<th>${col}</th>`).join("")}
+                    <th>New_G2_goal</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    for (const row of processedData) {
+        tableHtml += `
+            <tr>
+                <td>${row.process}</td>
+                ${columns.map(col => `<td>${row[col]}</td>`).join("")}
+                <td>${row['New_G2_goal'] !== undefined ? row['New_G2_goal'] : '92'}</td>
+            </tr>
+        `;
+    }
+    
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+    
+    document.getElementById("resultsTable").innerHTML = tableHtml;
+    
+    // Store the processed data for export
+    ruleResults = processedData;
+}
+
+document.getElementById("exportResults").addEventListener("click", function() {
+    if (ruleResults.length === 0) {
+        alert("No results to export.");
+        return;
+    }
+    
+    // Create a new workbook
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(ruleResults);
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Results");
+    
+    // Export to file
+    XLSX.writeFile(wb, "goal_setting_results.xlsx");
+});
+
+// Custom value sidebar handlers
+document.getElementById("applyCustomValue").addEventListener("click", function() {
+    const customValue = document.getElementById("customValueInput").value;
+    if (customValue && activeValueFieldId) {
+        const valueField = document.querySelector(`.valueSelect[data-rule-id="${activeValueFieldId}"]`);
+        valueField.value = customValue;
+        valueField.classList.remove("hidden");
+        
+        // Update the dropdown to show "Type Value" again
+        const dropdown = document.querySelector(`.columnOrValue[data-rule-id="${activeValueFieldId}"]`);
+        dropdown.value = "value";
+        
+        // Hide sidebar
+        document.getElementById("customValueSidebar").classList.add("hidden");
+        document.getElementById("customValueInput").value = "";
+        activeValueFieldId = null;
+    }
+});
+
+document.getElementById("cancelCustomValue").addEventListener("click", function() {
+    document.getElementById("customValueSidebar").classList.add("hidden");
+    document.getElementById("customValueInput").value = "";
+    
+    if (activeValueFieldId) {
+        const dropdown = document.querySelector(`.columnOrValue[data-rule-id="${activeValueFieldId}"]`);
+        dropdown.value = "value";
+        activeValueFieldId = null;
+    }
+});
+
+// Template handling
+document.getElementById("applyTemplate").addEventListener("click", function() {
+    const templateType = document.getElementById("templateDropdown").value;
+    if (!templateType) return;
+    
+    // Clear existing rules
+    document.getElementById("ruleContainer").innerHTML = "";
+    
+    // Apply template
+    applyRuleTemplate(templateType);
+});    
+
+function applyRuleTemplate(templateType) {
+    switch(templateType) {
+        case "standard":
+            applyStandardTemplate();
+            break;
+        case "stretch":
+            applyStretchTemplate();
+            break;
+        case "balanced":
+            applyBalancedTemplate();
+            break;
+    }
+}
+
+function applyStandardTemplate() {
+    document.getElementById("ruleName").value = "Standard Goal Setting";
+    currentRuleId++;
+    
+    const column = columns[0]; // Assuming first column is the primary metric
+    const ruleHtml = `
+        <div class='nested-container' data-rule-id="${currentRuleId}">
+            <div class='rule-box'>
+                <span>If</span>
+                <select class='form-select columnSelect dropdown'>
+                    ${columns.map(col => `<option value="${col}" ${col === column ? 'selected' : ''}>${col}</option>`).join("")}
+                </select>
+                <select class='form-select operatorSelect dropdown'>
+                    <option value='>'>></option>
+                    <option value='<'><</option>
+                    <option value='=' selected>=</option>
+                    <option value='>='>>=</option>
+                    <option value='<='><=</option>
+                </select>
+                <select class='form-select columnOrValue dropdown' data-rule-id="${currentRuleId}">
+                    <option value='value' selected>Type Value</option>
+                    <option value='custom'>Add Custom Value</option>
+                    ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                </select>
+                <input type='number' class='form-control valueSelect' data-rule-id="${currentRuleId}" placeholder='Enter Value' value="0">
+                <button class='btn btn-danger btn-small remove-rule'>×</button>
+            </div>
+            <div class='rule-box logic-buttons'>
+                <button class='btn btn-info btn-small addAndCondition'>+ AND</button>
+                <button class='btn btn-info btn-small addOrCondition'>+ OR</button>
+            </div>
+            <div class='nested-container'>
+                <div class='rule-box'>
+                    <span>Then</span>
+                    <select class='form-select resultColumn dropdown'>${columns.map(col => `<option value="${col}" ${col === column ? 'selected' : ''}>${col}</option>`).join("")}</select>
+                    <select class='form-select actionType dropdown'>
+                        <option value='value'>Set Value</option>
+                        <option value='add'>Add Value</option>
+                        <option value='subtract'>Subtract Value</option>
+                        <option value='percent-increase' selected>% Increase</option>
+                        <option value='percent-decrease'>% Decrease</option>
+                    </select>
+                    <input type='number' class='form-control thresholdSelect' placeholder='Value' value="10">
+                    <span class='percentage-symbol'>%</span>
+                </div>
+                <div class='rule-box'>
+                    <span>Else</span>
+                    <button class='btn btn-secondary btn-small addNestedIf'>+ Add Nested If</button>
+                    <button class='btn btn-secondary btn-small addElseCondition'>+ Add Else Condition</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById("ruleContainer").innerHTML = ruleHtml;
+    attachColumnOrValueListeners(currentRuleId);
+    attachAllEventListeners();
+}
+
+function applyStretchTemplate() {
+    document.getElementById("ruleName").value = "Stretch Goals";
+    currentRuleId++;
+    
+    const column = columns[0]; // Assuming first column is the primary metric
+    const ruleHtml = `
+        <div class='nested-container' data-rule-id="${currentRuleId}">
+            <div class='rule-box'>
+                <span>If</span>
+                <select class='form-select columnSelect dropdown'>
+                    ${columns.map(col => `<option value="${col}" ${col === column ? 'selected' : ''}>${col}</option>`).join("")}
+                </select>
+                <select class='form-select operatorSelect dropdown'>
+                    <option value='>'>></option>
+                    <option value='<'><</option>
+                    <option value='=' selected>=</option>
+                    <option value='>='>>=</option>
+                    <option value='<='><=</option>
+                </select>
+                <select class='form-select columnOrValue dropdown' data-rule-id="${currentRuleId}">
+                    <option value='value' selected>Type Value</option>
+                    <option value='custom'>Add Custom Value</option>
+                    ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                </select>
+                <input type='number' class='form-control valueSelect' data-rule-id="${currentRuleId}" placeholder='Enter Value' value="0">
+                <button class='btn btn-danger btn-small remove-rule'>×</button>
+            </div>
+            <div class='rule-box logic-buttons'>
+                <button class='btn btn-info btn-small addAndCondition'>+ AND</button>
+                <button class='btn btn-info btn-small addOrCondition'>+ OR</button>
+            </div>
+            <div class='nested-container'>
+                <div class='rule-box'>
+                    <span>Then</span>
+                    <select class='form-select resultColumn dropdown'>${columns.map(col => `<option value="${col}" ${col === column ? 'selected' : ''}>${col}</option>`).join("")}</select>
+                    <select class='form-select actionType dropdown'>
+                        <option value='value'>Set Value</option>
+                        <option value='add'>Add Value</option>
+                        <option value='subtract'>Subtract Value</option>
+                        <option value='percent-increase' selected>% Increase</option>
+                        <option value='percent-decrease'>% Decrease</option>
+                    </select>
+                    <input type='number' class='form-control thresholdSelect' placeholder='Value' value="15">
+                    <span class='percentage-symbol'>%</span>
+                </div>
+                <div class='rule-box'>
+                    <span>Else</span>
+                    <button class='btn btn-secondary btn-small addNestedIf'>+ Add Nested If</button>
+                    <button class='btn btn-secondary btn-small addElseCondition'>+ Add Else Condition</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById("ruleContainer").innerHTML = ruleHtml;
+    attachColumnOrValueListeners(currentRuleId);
+    attachAllEventListeners();
+}
+
+function applyBalancedTemplate() {
+    document.getElementById("ruleName").value = "Balanced Metrics";
+    
+    if (columns.length < 2) {
+        alert("Need at least 2 columns for balanced template");
+        return;
+    }
+    
+    currentRuleId++;
+    const mainColumn = columns[0];
+    const secondaryColumn = columns[1];
+    
+    const ruleHtml = `
+        <div class='nested-container' data-rule-id="${currentRuleId}">
+            <div class='rule-box'>
+                <span>If</span>
+                <select class='form-select columnSelect dropdown'>
+                    ${columns.map(col => `<option value="${col}" ${col === mainColumn ? 'selected' : ''}>${col}</option>`).join("")}
+                </select>
+                <select class='form-select operatorSelect dropdown'>
+                    <option value='>'>></option>
+                    <option value='<'><</option>
+                    <option value='=' selected>=</option>
+                    <option value='>='>>=</option>
+                    <option value='<='><=</option>
+                </select>
+                <select class='form-select columnOrValue dropdown' data-rule-id="${currentRuleId}">
+                    <option value='value' selected>Type Value</option>
+                    <option value='custom'>Add Custom Value</option>
+                    ${columns.map(col => `<option value="${col}">${col}</option>`).join("")}
+                </select>
+                <input type='number' class='form-control valueSelect' data-rule-id="${currentRuleId}" placeholder='Enter Value' value="0">
+                <button class='btn btn-danger btn-small remove-rule'>×</button>
+            </div>
+            <div class='rule-box logic-buttons'>
+                <button class='btn btn-info btn-small addAndCondition'>+ AND</button>
+                <button class='btn btn-info btn-small addOrCondition'>+ OR</button>
+            </div>
+            <div class='nested-container'>
+                <div class='rule-box'>
+                    <span>Then</span>
+                    <select class='form-select resultColumn dropdown'>${columns.map(col => `<option value="${col}" ${col === mainColumn ? 'selected' : ''}>${col}</option>`).join("")}</select>
+                    <select class='form-select actionType dropdown'>
+                        <option value='value'>Set Value</option>
+                        <option value='add'>Add Value</option>
+                        <option value='subtract'>Subtract Value</option>
+                        <option value='percent-increase' selected>% Increase</option>
+                        <option value='percent-decrease'>% Decrease</option>
+                    </select>
+                    <input type='number' class='form-control thresholdSelect' placeholder='Value' value="10">
+                    <span class='percentage-symbol'>%</span>
+                </div>
+                <div class='nested-container'>
+                    <div class='rule-box'>
+                        <span>Else Condition</span>
+                        <select class='form-select resultColumn dropdown'>
+                            ${columns.map(col => `<option value="${col}" ${col === secondaryColumn ? 'selected' : ''}>${col}</option>`).join("")}
+                        </select>
+                        <select class='form-select actionType dropdown'>
+                            <option value='value'>Set Value</option>
+                            <option value='add'>Add Value</option>
+                            <option value='subtract'>Subtract Value</option>
+                            <option value='percent-increase' selected>% Increase</option>
+                            <option value='percent-decrease'>% Decrease</option>
+                        </select>
+                        <input type='number' class='form-control thresholdSelect' placeholder='Value' value="5">
+                        <span class='percentage-symbol'>%</span>
+                        <button class='btn btn-danger btn-small remove-rule'>×</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById("ruleContainer").innerHTML = ruleHtml;
+    attachColumnOrValueListeners(currentRuleId);
+    attachAllEventListeners();
+}
+// Final closing script tag to complete the HTML document
+</script>
+</body>
+</html>
